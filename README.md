@@ -69,6 +69,22 @@ The extension comes with Groq AI built-in, providing:
 - **Completely free** for you to use
 - **Secure** - your data stays private
 
+### Customization Settings (Optional)
+
+While Layr works great out of the box, you can customize your plans:
+
+**Plan Size** (Settings > Layr > Plan Size):
+- **Concise**: 80-100 lines, quick overviews
+- **Normal**: 180-240 lines, balanced detail (default)
+- **Descriptive**: 300+ lines, comprehensive plans
+
+**Plan Type** (Settings > Layr > Plan Type):
+- **Hobby**: Simple learning projects with basic tools
+- **SaaS**: Multi-tenant apps with billing and scalability
+- **Production**: Enterprise-grade with full CI/CD
+- **Enterprise**: Microservices with advanced infrastructure
+- **Prototype**: Rapid MVPs for quick validation
+- **Open Source**: Community-focused with contribution guidelines
 ### For Developers: Using Your Own Groq Key
 
 If you're forking this extension or want to use your own Groq API key:

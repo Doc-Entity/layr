@@ -2,6 +2,29 @@
 
 All notable changes to the "Layr" extension will be documented in this file.
 
+## [2.0.1] - 2025-11-22
+
+### Added
+- Customizable plan generation with size and type settings
+- Plan Size options: Concise (80-100 lines), Normal (180-240 lines), Descriptive (300+ lines)
+- Plan Type options: Hobby, SaaS, Production, Enterprise, Prototype, Open Source
+- Intelligent prompt engineering that adapts to user preferences
+- Timestamp in watermark showing generation date and time
+- Type-specific features (e.g., Hobby projects use SQLite, skip CI/CD; SaaS includes billing, multi-tenancy)
+- Size-aware content scaling across all plan sections
+
+### Changed
+- Enhanced system prompts with explicit size constraints and line count targets
+- Improved AI differentiation between plan types with feature inclusion/exclusion lists
+- Watermark moved to top of generated plans for better Execute Plan integration
+- Added generation timestamp to watermark for tracking
+- Optimized token usage based on plan size (2500/5000/8000 maxTokens)
+
+### Fixed
+- Plans now properly respect size settings with accurate line counts
+- Different plan types generate distinctly different outputs
+- Hobby projects no longer include enterprise features unnecessarily
+
 ## [1.1.0] - 2025-11-22
 
 ### Added
