@@ -42,13 +42,54 @@
     ],
     "configuration": {
       "title": "Layr",
-      "properties": {}
+      "properties": {
+        "layr.planSize": {
+          "type": "string",
+          "default": "Normal",
+          "enum": [
+            "Concise",
+            "Normal",
+            "Descriptive"
+          ],
+          "enumDescriptions": [
+            "Brief, focused plans with essential information only",
+            "Balanced plans with good detail and structure",
+            "Comprehensive, detailed plans with extensive explanations"
+          ],
+          "description": "Control the level of detail in generated plans"
+        },
+        "layr.planType": {
+          "type": "string",
+          "default": "SaaS",
+          "enum": [
+            "Hobby",
+            "SaaS",
+            "Production",
+            "Enterprise",
+            "Prototype",
+            "Open Source"
+          ],
+          "enumDescriptions": [
+            "Personal projects and learning exercises",
+            "Software as a Service applications",
+            "Production-ready commercial applications",
+            "Large-scale enterprise applications",
+            "Quick prototypes and proof of concepts",
+            "Open source community projects"
+          ],
+          "description": "Type of project being planned - affects architecture and recommendations"
+        }
+      }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish:vscode": "vsce publish",
+    "publish:openvsx": "ovsx publish -p $OVSX_TOKEN",
+    "publish:all": "npm run publish:vscode && npm run publish:openvsx"
   },
   "devDependencies": {
     "@types/node": "16.x",

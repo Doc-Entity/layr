@@ -31,6 +31,13 @@ export class Planner {
     // Force refresh config to ensure we have the latest API key
     this.refreshConfig();
     
+    // Get user settings
+    const config = vscode.workspace.getConfiguration('layr');
+    const planSize = config.get<string>('planSize', 'Normal');
+    const planType = config.get<string>('planType', 'SaaS');
+    
+    console.log('Planner.generatePlan: Plan size:', planSize);
+    console.log('Planner.generatePlan: Plan type:', planType);
     console.log('Planner.generatePlan: AI provider exists:', !!this.aiProvider);
     console.log('Planner.generatePlan: AI provider type:', this.aiProvider?.type || 'none');
     
@@ -54,7 +61,7 @@ export class Planner {
 
     try {
       console.log('Planner.generatePlan: Attempting AI plan generation with', this.aiProvider.name);
-      const planMarkdown = await this.aiProvider.generatePlan(prompt);
+      const planMarkdown = await this.aiProvider.generatePlan(prompt, { planSize, planType });
       console.log('Planner.generatePlan: AI plan generation successful');
       console.log('Planner.generatePlan: Raw response length:', planMarkdown.length);
       console.log('Planner.generatePlan: Raw response preview:', planMarkdown.substring(0, 200));

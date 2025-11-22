@@ -44,6 +44,14 @@ Layr comes **pre-configured with Groq AI** - just install and start planning imm
 3. Search for "Layr"
 4. Click Install
 
+### From Open VSX Registry (for Cursor, Antigravity, Windsurf, VSCodium, etc.)
+1. Open your IDE
+2. Go to Extensions
+3. Search for "Layr"
+4. Click Install
+
+Or install directly from [Open VSX Registry](https://open-vsx.org/extension/ManasDutta/layr)
+
 ### From Source
 1. Clone this repository
 2. Open in VS Code
@@ -56,12 +64,12 @@ Layr comes **pre-configured with Groq AI** - just install and start planning imm
 
 **Layr is 100% pre-configured!** Just install and start using it immediately.
 
-- ✅ No API keys to enter
-- ✅ No settings to configure  
-- ✅ No account required
-- ✅ No setup steps
+- No API keys to enter
+- No settings to configure  
+- No account required
+- No setup steps
 
-**It just works!** ⚡
+**It just works!**
 
 The extension comes with Groq AI built-in, providing:
 - **Ultra-fast** responses (1-3 seconds)
@@ -69,6 +77,22 @@ The extension comes with Groq AI built-in, providing:
 - **Completely free** for you to use
 - **Secure** - your data stays private
 
+### Customization Settings (Optional)
+
+While Layr works great out of the box, you can customize your plans:
+
+**Plan Size** (Settings > Layr > Plan Size):
+- **Concise**: 80-100 lines, quick overviews
+- **Normal**: 180-240 lines, balanced detail (default)
+- **Descriptive**: 300+ lines, comprehensive plans
+
+**Plan Type** (Settings > Layr > Plan Type):
+- **Hobby**: Simple learning projects with basic tools
+- **SaaS**: Multi-tenant apps with billing and scalability
+- **Production**: Enterprise-grade with full CI/CD
+- **Enterprise**: Microservices with advanced infrastructure
+- **Prototype**: Rapid MVPs for quick validation
+- **Open Source**: Community-focused with contribution guidelines
 ### For Developers: Using Your Own Groq Key
 
 If you're forking this extension or want to use your own Groq API key:
@@ -268,10 +292,9 @@ npm run vscode:prepublish
 
 MIT License - see LICENSE file for details
 
-##  Acknowledgments
+##  Creators
 
 - Developed by [Manas Dutta](https://github.com/manasdutta04)
-- Built with [VS Code Extension API](https://code.visualstudio.com/api)
 
 ## Issues & Support
 
