@@ -202,7 +202,7 @@ CRITICAL: Return ONLY valid JSON. Do not wrap in markdown code blocks. Do not in
       console.log('GeminiProvider: Raw AI response length:', text.length);
 
       if (!text || text.trim() === '') {
-        throw new AIServiceError('Empty response from Gemini API');
+        throw new AIServiceError('AI service returned an empty response. Please try again.');
       }
 
       return text;
@@ -211,10 +211,67 @@ CRITICAL: Return ONLY valid JSON. Do not wrap in markdown code blocks. Do not in
       if (error instanceof APIKeyMissingError) {
         throw error;
       }
-      throw new AIServiceError(
-        `Failed to generate plan with Gemini: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error : undefined
-      );
+      
+      const errorStr = error instanceof Error ? error.message : String(error);
+      let userFriendlyMsg = `Failed to generate plan: ${errorStr}`;
+      
+      // Provide generic guidance based on error type
+      if (errorStr.includes('429') || errorStr.includes('quota')) {
+        userFriendlyMsg = 'Service quota exceeded. Please wait a few minutes and try again.';
+      } else if (errorStr.includes('401') || errorStr.includes('unauthorized')) {
+        userFriendlyMsg = 'Authentication failed. Please verify your configuration.';
+      } else if (errorStr.includes('network') || errorStr.includes('fetch')) {
+        userFriendlyMsg = 'Network connection error. Check your internet connection and firewall settings.';
+      } else if (errorStr.includes('Safety') || errorStr.includes('safety')) {
+        userFriendlyMsg = 'Your request was blocked by content policies. Try rephrasing your project description.';
+      }
+      
+      throw new AIServiceError(userFriendlyMsg, error instanceof Error ? error : undefined);
+    }
+  }
+
+  async refineSection(sectionContent: string, refinementPrompt: string, fullContext: string): Promise<string> {
+    if (!this.genAI) {
+      throw new APIKeyMissingError('gemini');
+    }
+
+    try {
+      const modelName = this.config.model || 'gemini-pro';
+      const model = this.genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+        }
+      });
+
+      const systemPrompt = `You are an expert software architect. Refine the following section of a project plan based on the user's request.
+      
+Original Section Content:
+"${sectionContent}"
+
+User's Refinement Request:
+"${refinementPrompt}"
+
+Full Plan Context (for reference):
+"${fullContext}"
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the refined content for this section.
+2. Maintain the same Markdown heading level as the original section if applicable.
+3. Ensure the refined content fits seamlessly back into the full plan.
+4. Do not include any introductory or concluding text.
+5. If the user asks for more detail, be specific and technical.`;
+
+      const result = await model.generateContent(systemPrompt);
+      const response = await result.response;
+      const text = response.text();
+      return text;
+    } catch (error) {
+      console.error('GeminiProvider.refineSection error:', error);
+      throw new AIServiceError(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -226,6 +283,10 @@ CRITICAL: Return ONLY valid JSON. Do not wrap in markdown code blocks. Do not in
       return true;
     } catch (error) {
       console.error('GeminiProvider: API key validation failed:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('authentication')) {
+        console.error('GeminiProvider: Invalid API key detected. Get one at: https://ai.google.dev/tutorials/rest_quickstart');
+      }
       return false;
     }
   }

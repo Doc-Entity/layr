@@ -26,9 +26,9 @@ export class GroqProvider implements AIProvider {
   async generatePlan(prompt: string, options?: any): Promise<string> {
     if (!this.useProxy) {
       throw new AIServiceError(
-        'Layr AI backend is not configured yet. ' +
-        'The extension author needs to deploy the API proxy. ' +
-        'Please check for updates or contact support.'
+        'Layr AI backend proxy is not configured. ' +
+        'The extension author needs to deploy the API. ' +
+        'For documentation, visit: https://github.com/manasdutta04/layr#setup'
       );
     }
 
@@ -636,14 +636,30 @@ CRITICAL REMINDER: Your response MUST be ${planSize === 'Concise' ? 'EXACTLY 80-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Proxy API Error:', errorText);
-        throw new AIServiceError(`API request failed (${response.status}): ${errorText}`);
+        
+        let userMsg = `API request failed (${response.status}): ${errorText}`;
+        
+        // Provide generic guidance for common HTTP errors
+        if (response.status === 401 || response.status === 403) {
+          userMsg = `Authentication failed (${response.status}). Please verify your configuration.`;
+        } else if (response.status === 429) {
+          userMsg = `Rate limit exceeded (${response.status}). Please wait a moment and try again.`;
+        } else if (response.status === 500 || response.status === 502 || response.status === 503) {
+          userMsg = `Service temporarily unavailable (${response.status}). Please try again in a few minutes.`;
+        } else if (response.status === 408 || response.status === 504) {
+          userMsg = `Request timeout (${response.status}). Try again with a simpler project description.`;
+        } else if (response.status >= 400 && response.status < 500) {
+          userMsg = `Request error (${response.status}): ${errorText}. Check your configuration at: https://github.com/manasdutta04/layr#setup`;
+        }
+        
+        throw new AIServiceError(userMsg);
       }
 
       const data = await response.json() as any;
       const content = data.content || '';
       
       if (!content) {
-        throw new AIServiceError('API returned empty response');
+        throw new AIServiceError('AI service returned an empty response. This might indicate a temporary service issue. Please try again.');
       }
 
       return content;
@@ -651,8 +667,70 @@ CRITICAL REMINDER: Your response MUST be ${planSize === 'Concise' ? 'EXACTLY 80-
       if (error instanceof AIServiceError) {
         throw error;
       }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new AIServiceError(`Failed to generate plan: ${errorMessage}`, error as Error);
+      
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      let userMsg = `Failed to generate plan: ${errorMsg}`;
+      
+      // Provide generic guidance for network errors
+      if (errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('ECONNREFUSED')) {
+        userMsg = 'Network connection error. Check your internet connection and firewall settings.';
+      } else if (errorMsg.includes('ENOTFOUND') || errorMsg.includes('ETIMEDOUT')) {
+        userMsg = 'Cannot reach the service. Check your internet connection or try again in a few moments.';
+      } else if (errorMsg.includes('JSON')) {
+        userMsg = 'Invalid response format received. This is likely a temporary issue. Please try again shortly.';
+      }
+      
+      throw new AIServiceError(userMsg, error as Error);
+    }
+  }
+
+  async refineSection(sectionContent: string, refinementPrompt: string, fullContext: string): Promise<string> {
+    if (!this.useProxy) {
+      throw new AIServiceError('Layr AI backend proxy is not configured.');
+    }
+
+    try {
+      const systemPrompt = `You are an expert software architect. Refine the following section of a project plan based on the user's request.
+      
+Original Section Content:
+"${sectionContent}"
+
+User's Refinement Request:
+"${refinementPrompt}"
+
+Full Plan Context (for reference):
+"${fullContext}"
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the refined content for this section.
+2. Maintain the same Markdown heading level as the original section if applicable.
+3. Ensure the refined content fits seamlessly back into the full plan.
+4. Do not include any introductory or concluding text.
+5. If the user asks for more detail, be specific and technical.`;
+
+      const response = await fetch(this.proxyURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: {
+            systemPrompt: systemPrompt,
+            userPrompt: refinementPrompt
+          },
+          model: this.model,
+          maxTokens: 4000
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json() as any;
+      return data.content || '';
+    } catch (error) {
+      console.error('GroqProvider.refineSection error:', error);
+      throw new AIServiceError(error instanceof Error ? error.message : String(error));
     }
   }
 

@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
+import MarkdownIt from 'markdown-it';
 import { planner } from './planner';
+import { PlanRefiner } from './planner/refiner';
 
 /**
  * This method is called when the extension is activated
@@ -44,17 +46,63 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     } catch (error) {
-      console.log('Layr: Error loading .env:', error);
+      console.log('Layr: Error loading .env file:', error instanceof Error ? error.message : String(error));
+      console.log('Layr: Tip: Ensure .env file exists in extension directory. See: https://github.com/manasdutta04/layr#setup');
     }
     
     console.log('Layr: Final GROQ_API_KEY status:', process.env.GROQ_API_KEY ? '***configured*** (length: ' + process.env.GROQ_API_KEY.length + ')' : 'not found');
   } else {
-    console.log('Layr: No .env file found in extension directory');
+    console.log('Layr: No .env file found in extension directory. API key should be set via VS Code settings. Guide: https://github.com/manasdutta04/layr#configuration');
   }
 
   // Refresh planner configuration after .env is loaded
   console.log('Layr: Refreshing planner configuration after .env load');
   planner.refreshConfig();
+
+  // Register the "Refine Plan Section" command
+  const refinePlanSectionCommand = vscode.commands.registerCommand('layr.refinePlanSection', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showErrorMessage('No active editor found');
+      return;
+    }
+
+    const document = editor.document;
+    const selection = editor.selection;
+
+    // Identify section
+    const section = PlanRefiner.getSectionAtSelection(document, selection);
+    if (!section) {
+      vscode.window.showErrorMessage('Could not identify a plan section at the current selection');
+      return;
+    }
+
+    // Prompt for refinement
+    const refinementPrompt = await vscode.window.showInputBox({
+      prompt: `How would you like to refine the "${section.title}" section?`,
+      placeHolder: 'e.g., Add more detail to the database schema, include security considerations...',
+      ignoreFocusOut: true
+    });
+
+    if (!refinementPrompt) {
+      return; // User cancelled
+    }
+
+    // Show progress
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: `Refining section: ${section.title}...`,
+      cancellable: false
+    }, async (progress) => {
+      progress.report({ message: 'AI is thinking...' });
+      
+      const refinedContent = await PlanRefiner.refine(document, section, refinementPrompt);
+      
+      if (refinedContent) {
+        await PlanRefiner.showDiffAndApply(document, section, refinedContent);
+      }
+    });
+  });
 
   // Register the "Create Plan" command
   const createPlanCommand = vscode.commands.registerCommand('layr.createPlan', async () => {
@@ -79,24 +127,36 @@ export function activate(context: vscode.ExtensionContext) {
         return; // User cancelled
       }
 
-      // Show progress indicator
+      // Show progress indicator with percentage tracking
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: 'Generating project plan...',
         cancellable: false
       }, async (progress) => {
-        progress.report({ increment: 0, message: 'Analyzing your request...' });
+        // Track cumulative percentage for smooth visual feedback
+        let lastReportedPercentage = 0;
+        
+        const updateProgress = (targetPercentage: number, message: string) => {
+          const increment = targetPercentage - lastReportedPercentage;
+          lastReportedPercentage = targetPercentage;
+          progress.report({ 
+            increment: increment,
+            message: `[${targetPercentage}%] ${message}`
+          });
+        };
         
         try {
-          // Generate the plan
-          const plan = await planner.generatePlan(prompt.trim());
+          // Stage 1: Analyze request
+          updateProgress(15, 'Analyzing your request...');
           
-          progress.report({ increment: 50, message: 'Converting to Markdown...' });
+          // Generate the plan
+          updateProgress(35, 'Connecting to AI provider...');
+          const plan = await planner.generatePlan(prompt.trim());
+          updateProgress(60, 'Formatting plan as Markdown...');
           
           // Convert plan to Markdown
           const markdown = planner.planToMarkdown(plan);
-          
-          progress.report({ increment: 80, message: 'Opening plan in editor...' });
+          updateProgress(80, 'Preparing document...');
           
           // Create a new document with the plan
           const doc = await vscode.workspace.openTextDocument({
@@ -104,24 +164,36 @@ export function activate(context: vscode.ExtensionContext) {
             language: 'markdown'
           });
           
+          updateProgress(90, 'Opening in editor...');
+          
           // Show the document in a new editor
           await vscode.window.showTextDocument(doc, {
             preview: false,
             viewColumn: vscode.ViewColumn.One
           });
           
-          progress.report({ increment: 100, message: 'Plan generated successfully!' });
+          updateProgress(100, 'Plan generated successfully! ✨');
           
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          vscode.window.showErrorMessage(`Failed to generate plan: ${errorMessage}`);
+          const fullError = `Failed to generate plan:
+
+${errorMessage}
+
+Documentation: https://github.com/manasdutta04/layr#troubleshooting`;
+          vscode.window.showErrorMessage(fullError);
           console.error('Plan generation error:', error);
         }
       });
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      vscode.window.showErrorMessage(`Error: ${errorMessage}`);
+      const fullError = `Error creating plan:
+
+${errorMessage}
+
+Need help? Visit: https://github.com/manasdutta04/layr#troubleshooting`;
+      vscode.window.showErrorMessage(fullError);
       console.error('Create plan command error:', error);
     }
   });
@@ -136,11 +208,14 @@ export function activate(context: vscode.ExtensionContext) {
         const action = await vscode.window.showWarningMessage(
           'No plan file is currently open. Please open a Layr-generated plan (.md file) or create a new plan first.',
           'Create Plan',
+          'Need Help',
           'Cancel'
         );
         
         if (action === 'Create Plan') {
           await vscode.commands.executeCommand('layr.createPlan');
+        } else if (action === 'Need Help') {
+          vscode.env.openExternal(vscode.Uri.parse('https://github.com/manasdutta04/layr#how-to-use'));
         }
         return;
       }
@@ -148,7 +223,7 @@ export function activate(context: vscode.ExtensionContext) {
       // Check if it's a markdown file
       if (editor.document.languageId !== 'markdown') {
         vscode.window.showWarningMessage(
-          'Please open a Layr plan file (.md) to execute it. The active file is not a markdown document.'
+          'Please open a Layr plan file (.md) to execute it. The active file is not a markdown document.\n\nGuide: https://github.com/manasdutta04/layr#Usage-guide'
         );
         return;
       }
@@ -159,9 +234,15 @@ export function activate(context: vscode.ExtensionContext) {
       // Check if it's a Layr-generated plan (has the watermark)
       const layrWatermark = '*Generated by Layr';
       if (!content.includes(layrWatermark)) {
-        vscode.window.showWarningMessage(
-          'This markdown file was not generated by Layr AI. Only Layr-generated plans can be executed for safety reasons.'
+        const action = await vscode.window.showWarningMessage(
+          'This markdown file was not generated by Layr AI. Only Layr-generated plans can be executed for safety reasons.\n\nCreate a new plan: https://github.com/manasdutta04/layr#Usage-guide',
+          'Create New Plan',
+          'Cancel'
         );
+        
+        if (action === 'Create New Plan') {
+          await vscode.commands.executeCommand('layr.createPlan');
+        }
         return;
       }
 
@@ -228,7 +309,7 @@ export function activate(context: vscode.ExtensionContext) {
             chatOpened = true;
             
             vscode.window.showInformationMessage(
-              'Plan sent to Cursor AI! Check the chat panel to start implementation.'
+              'Plan sent to Cursor AI! Check the chat panel to start implementation. Docs: https://github.com/manasdutta04/layr#implementation'
             );
           } catch (e) {
             console.log('Failed to open Cursor Chat:', e);
@@ -292,10 +373,11 @@ export function activate(context: vscode.ExtensionContext) {
           await vscode.env.clipboard.writeText(content);
           
           const action = await vscode.window.showInformationMessage(
-            'Plan copied to clipboard!\n\nPaste it into your AI assistant to get implementation help.',
+            'Could not open AI Chat. Plan copied to clipboard!\n\nPaste it into your AI assistant (ChatGPT, Claude, GitHub Copilot, etc.) to get implementation help.',
             { modal: false },
             'Try Opening Chat',
-            'Instructions'
+            'Instructions',
+            'Docs'
           );
 
           if (action === 'Try Opening Chat') {
@@ -303,11 +385,13 @@ export function activate(context: vscode.ExtensionContext) {
               await vscode.commands.executeCommand('workbench.action.chat.open');
             } catch (e) {
               vscode.window.showInformationMessage(
-                'Could not automatically open chat. Please open your AI assistant manually and paste the plan from clipboard.'
+                'Could not automatically open chat. Please open your AI assistant manually and paste the plan from clipboard.\n\nGuide: https://github.com/manasdutta04/layr#implementation'
               );
             }
           } else if (action === 'Instructions') {
             showExecutionInstructions();
+          } else if (action === 'Docs') {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/manasdutta04/layr#how-to-execute-plans'));
           }
         }
 
@@ -316,24 +400,244 @@ export function activate(context: vscode.ExtensionContext) {
         
         // Fallback: Copy to clipboard
         await vscode.env.clipboard.writeText(content);
-        vscode.window.showInformationMessage(
-          'Plan copied to clipboard! Paste it into your AI coding assistant to get started.',
-          'Got it'
+        const action = await vscode.window.showInformationMessage(
+          'Plan copied to clipboard! Paste it into your AI coding assistant to get started.\n\nTroubleshooting: https://github.com/manasdutta04/layr#troubleshooting',
+          'Got it',
+          'Read Docs'
         );
+        
+        if (action === 'Read Docs') {
+          vscode.env.openExternal(vscode.Uri.parse('https://github.com/manasdutta04/layr#how-to-execute-plans'));
+        }
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      vscode.window.showErrorMessage(`Error executing plan: ${errorMessage}`);
+      const fullError = `Error executing plan:
+
+${errorMessage}
+
+Troubleshooting: https://github.com/manasdutta04/layr#troubleshooting`;
+      vscode.window.showErrorMessage(fullError);
       console.error('Execute plan command error:', error);
+    }
+  });
+
+  // Register the "Export Plan" command
+  const exportPlanCommand = vscode.commands.registerCommand('layr.exportPlan', async () => {
+    try {
+      // Get the active editor
+      const editor = vscode.window.activeTextEditor;
+      
+      if (!editor) {
+        vscode.window.showWarningMessage('No plan file is currently open. Please open a Layr plan (.md file) to export.');
+        return;
+      }
+
+      // Check if it's a markdown file
+      if (editor.document.languageId !== 'markdown') {
+        vscode.window.showWarningMessage('Please open a Markdown (.md) file to export.');
+        return;
+      }
+
+      // Get the document content
+      const content = editor.document.getText();
+
+      // Ask for export format
+      const format = await vscode.window.showQuickPick(['HTML'], {
+        placeHolder: 'Select export format'
+      });
+
+      if (!format) {
+        return;
+      }
+
+      // Show progress
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Exporting plan to ${format}...`,
+        cancellable: false
+      }, async (progress) => {
+        try {
+          const md = new MarkdownIt({
+            html: true,
+            linkify: true,
+            typographer: true
+          });
+
+          const htmlContent = md.render(content);
+          
+          // Apply styling
+          const styledHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layr Project Plan</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 3rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #1a202c;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+        h1 { 
+            font-size: 2.5rem;
+            border-bottom: 3px solid #4a90e2; 
+            padding-bottom: 0.5rem;
+            color: #2d3748;
+        }
+        h2 { 
+            font-size: 1.8rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.3rem;
+            margin-top: 2.5rem;
+        }
+        h3 { font-size: 1.4rem; color: #4a5568; }
+        p { margin-bottom: 1.2rem; }
+        code {
+            background-color: #edf2f7;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+            color: #e53e3e;
+        }
+        pre {
+            background-color: #1a202c;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: inherit;
+            font-size: 0.85em;
+        }
+        blockquote {
+            border-left: 5px solid #4a90e2;
+            margin: 1.5rem 0;
+            padding: 0.5rem 0 0.5rem 1.5rem;
+            font-style: italic;
+            color: #4a5568;
+            background-color: #f7fafc;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 2rem 0;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            text-align: left;
+        }
+        th { 
+            background-color: #edf2f7;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        ul, ol { margin-bottom: 1.2rem; padding-left: 1.5rem; }
+        li { margin-bottom: 0.5rem; }
+        .footer {
+            margin-top: 4rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #718096;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 2rem;
+        }
+        @media print {
+            body { background-color: white; padding: 0; }
+            .container { box-shadow: none; padding: 0; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        ${htmlContent}
+        <div class="footer">
+            Generated by <a href="https://github.com/manasdutta04/layr" target="_blank" style="color: #4a90e2; text-decoration: none; font-weight: 600;">Layr - AI Planning Layer</a>
+        </div>
+    </div>
+</body>
+</html>
+          `;
+
+          // Determine save path
+          let savePath: string;
+          if (editor.document.isUntitled) {
+            // If unsaved, ask for directory
+            const uri = await vscode.window.showSaveDialog({
+              defaultUri: vscode.Uri.file('project-plan.html'),
+              filters: { 'HTML Files': ['html'] }
+            });
+            if (!uri) return;
+            savePath = uri.fsPath;
+          } else {
+            // Save in same directory
+            const sourcePath = editor.document.uri.fsPath;
+            savePath = sourcePath.replace(/\.md$/, '') + '.html';
+            
+            // If it already exists, confirm overwrite
+            if (fs.existsSync(savePath)) {
+              const overwrite = await vscode.window.showWarningMessage(
+                `File ${path.basename(savePath)} already exists. Overwrite?`,
+                'Yes', 'No'
+              );
+              if (overwrite !== 'Yes') return;
+            }
+          }
+
+          fs.writeFileSync(savePath, styledHtml);
+          
+          vscode.window.showInformationMessage(`Plan exported successfully to ${path.basename(savePath)}`, 'Open File').then(action => {
+            if (action === 'Open File') {
+              vscode.env.openExternal(vscode.Uri.file(savePath));
+            }
+          });
+
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          vscode.window.showErrorMessage(`Failed to export plan: ${errorMessage}`);
+          console.error('Export error:', error);
+        }
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      vscode.window.showErrorMessage(`Error exporting plan: ${errorMessage}`);
+      console.error('Export plan command error:', error);
     }
   });
 
   // Listen for configuration changes
   const configChangeListener = vscode.workspace.onDidChangeConfiguration(event => {
     if (event.affectsConfiguration('layr.planSize') ||
-        event.affectsConfiguration('layr.planType')) {
-      vscode.window.showInformationMessage('Layr: Configuration updated! Changes will take effect on next plan generation.');
+        event.affectsConfiguration('layr.planType') ||
+        event.affectsConfiguration('layr.geminiApiKey')) {
+      vscode.window.showInformationMessage('✅ Layr configuration updated! Changes will take effect on your next plan generation.');
     }
   });
 
@@ -341,7 +645,22 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     createPlanCommand,
     executePlanCommand,
-    configChangeListener
+    exportPlanCommand,
+    refinePlanSectionCommand,
+    configChangeListener,
+    vscode.commands.registerCommand('layr.applyRefinement', async (uri: vscode.Uri) => {
+      // If uri is not provided, try to get it from the active editor
+      const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+      if (targetUri) {
+        await PlanRefiner.applyActiveRefinement(targetUri);
+      }
+    }),
+    vscode.commands.registerCommand('layr.discardRefinement', async (uri: vscode.Uri) => {
+      const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+      if (targetUri) {
+        await PlanRefiner.discardActiveRefinement(targetUri);
+      }
+    })
   );
 
   // Show welcome message on first activation
@@ -356,14 +675,18 @@ export function activate(context: vscode.ExtensionContext) {
  */
 async function showWelcomeMessage(context: vscode.ExtensionContext) {
   const action = await vscode.window.showInformationMessage(
-    'Welcome to Layr! AI-powered project planning is ready to use - no configuration needed!',
+    '🎉 Welcome to Layr! AI-powered project planning is ready to use.',
     'Create First Plan',
+    'Setup Guide',
     'Learn More'
   );
 
   switch (action) {
     case 'Create First Plan':
       await vscode.commands.executeCommand('layr.createPlan');
+      break;
+    case 'Setup Guide':
+      vscode.env.openExternal(vscode.Uri.parse('https://github.com/manasdutta04/layr#setup'));
       break;
     case 'Learn More':
       vscode.env.openExternal(vscode.Uri.parse('https://github.com/manasdutta04/layr'));
@@ -378,8 +701,7 @@ async function showWelcomeMessage(context: vscode.ExtensionContext) {
  * Show execution instructions for manual implementation
  */
 function showExecutionInstructions() {
-  const instructions = `
-# How to Execute Your Layr Plan
+  const instructions = `# How to Execute Your Layr Plan
 
 Your plan has been copied to the clipboard! Here's how to use it with AI assistants:
 
@@ -390,7 +712,7 @@ Your plan has been copied to the clipboard! Here's how to use it with AI assista
 4. Follow the AI's guidance to build your project
 
 ## Using Cursor AI
-1. Open Cursor Chat (Ctrl+L or Cmd+L)
+1. Open Cursor Chat: Ctrl+L (or Cmd+L on Mac)
 2. Paste the plan
 3. Ask: "Help me implement this plan step by step"
 4. Work through each phase with Cursor's assistance
@@ -407,18 +729,24 @@ Your plan has been copied to the clipboard! Here's how to use it with AI assista
 3. Ask: "Help me implement this plan step by step"
 4. Follow the AI's implementation guidance
 
-## Using Other AI Assistants
-1. Open ChatGPT, Claude, or your preferred AI
-2. Paste the plan
-3. Ask for implementation help phase by phase
+## Using ChatGPT, Claude, or Other AI Assistants
+1. Visit ChatGPT (openai.com), Claude (claude.ai), or your preferred AI tool
+2. Paste the plan into the chat
+3. Ask: "Help me implement this project plan step by step"
 4. Copy the generated code back to your IDE
 
-## Tips for Best Results
+## Tips for Best Results ✨
 - ✅ Start with Phase 1 and work sequentially
-- ✅ Implement and test each step before moving on
+- ✅ Implement and test each step before moving to the next
 - ✅ Ask the AI to explain code you don't understand
-- ✅ Request code reviews and improvements
-- ✅ Use the plan's file structure as your guide
+- ✅ Request code reviews and improvements for quality
+- ✅ Use the plan's file structure as your project guide
+- ✅ Ask for help if you get stuck on any phase
+
+## Troubleshooting
+- If chat doesn't open: Copy the plan from clipboard and paste manually
+- For API errors: Check your AI provider configuration
+- For more help: https://github.com/manasdutta04/layr#troubleshooting
 
 Happy coding! 🚀
   `;
