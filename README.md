@@ -1,4 +1,7 @@
 # Layr - AI Planning Layer
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 **Transform your ideas into structured project plans with AI-powered planning for VS Code.**
 
@@ -9,7 +12,7 @@ Layr is a VS Code extension that generates comprehensive, actionable project pla
 Layr comes **pre-configured with Groq AI** - just install and start planning immediately:
 
 1. Install the extension
-2. Press `Ctrl+Shift+P` and type "Layr: Create Plan"
+2. Press `Ctrl+Shift+P` and type "Layr: Create Plan" (or press `Ctrl+Alt+P`)
 3. Describe your project
 4. Get your AI-generated plan instantly!
 
@@ -28,9 +31,17 @@ Layr comes **pre-configured with Groq AI** - just install and start planning imm
 
 **Intelligent Planning** : Leverages advanced LLMs (Llama 3.3) to create detailed, context-aware project plans.
 
+**Visual Progress Tracking** : Real-time progress indicators show generation status with percentage completion.
+
+**Iterative Refinement** : Select any section and refine it with AI using side-by-side diff view.
+
+**Export & Share** : Export plans to PDF or styled HTML formats for presentations and documentation.
+
 **Seamless Integration** : Native VS Code integration through Command Palette with instant access to planning tools.
 
 **Flexible Output** : Generates editable Markdown documents that you can customize and reference throughout development.
+
+**Enhanced Error Handling** : Helpful error messages with troubleshooting guidance for quick resolution.
 
 **Multi-Provider Support** : Optional support for Gemini, OpenAI, and Claude if you prefer other AI providers.
 
@@ -139,14 +150,15 @@ See `GROQ_SETUP.md` for detailed instructions.
 
 ### Creating a Plan
 
-1. **Open Command Palette** : Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
-2. **Run Command** : Type "Layr: Create Plan" and press Enter
-3. **Describe Your Project** : Enter a natural language description of what you want to build
+1. **Start Planning** : Press `Ctrl+Alt+P` (Windows/Linux) or `Cmd+Alt+P` (Mac) to create a plan immediately.
+   - Alternatively, open the **Command Palette** (`Ctrl+Shift+P` / `Cmd+Shift+P`), type "Layr: Create Plan" and press Enter.
+2. **Describe Your Project** : Enter a natural language description of what you want to build
    - Example: "A React todo app with user authentication and real-time updates"
    - Example: "A REST API for a blog platform with user management"
    - Example: "A Python data analysis script for sales reporting"
-4. **Review Generated Plan** : The extension will create a new Markdown file with your project plan
-5. **Customize as Needed** : Edit the generated plan to match your specific requirements
+4. **Watch Progress** : Track real-time progress with visual percentage indicators
+5. **Review Generated Plan** : The extension will create a new Markdown file with your project plan
+6. **Customize as Needed** : Edit the generated plan to match your specific requirements
 
 ### Executing a Plan
 
@@ -169,6 +181,61 @@ See `GROQ_SETUP.md` for detailed instructions.
 - Automatic detection of AI assistants across different IDEs
 - Universal clipboard fallback for any IDE
 
+### Refining Plan Sections
+
+1. **Select Text** : Highlight any section of your plan that needs improvement
+2. **Right-click** : Open the context menu
+3. **Choose "Refine Plan Section"** : Or use Command Palette (`Ctrl+Shift+P` → "Layr: Refine Plan Section")
+4. **Enter Refinement Prompt** : Describe how you want to improve the selected section
+   - Example: "Add more details about error handling"
+   - Example: "Include security best practices"
+   - Example: "Simplify this section for beginners"
+5. **Review Changes** : The refined section opens in a side-by-side diff view
+6. **Apply or Discard** : Click the checkmark (✓) to apply changes or X to discard
+
+**Benefits:**
+- Iteratively improve your plans without regenerating from scratch
+- Fine-tune specific sections while keeping the rest intact
+- Experiment with different approaches using the diff view
+- Maintain version control with side-by-side comparison
+
+### Exporting Plans
+
+1. **Open a Layr Plan** : Have your generated plan open in the editor
+2. **Open Command Palette** : Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
+3. **Run Command** : Type "Layr: Export Plan" and press Enter
+4. **Choose Format** : Select either PDF or HTML
+   - **PDF**: Perfect for sharing, presenting, or archiving
+   - **HTML**: Styled, interactive format for web viewing
+5. **Save Location** : Choose where to save your exported plan
+
+**Export Features:**
+- Professional formatting with proper styling
+- Preserves all markdown formatting and structure
+- Optimized layout for readability
+- Great for documentation and presentations
+
+### Plan Version Control 🆕
+
+Never lose track of your project's history. Layr now includes a powerful **Version Control System** that automatically tracks the evolution of your plans.
+
+**Features:**
+- **Auto-Save**: Every time you generate a plan or refine a section, a new version is saved automatically.
+- **History View**: Browse a visual timeline of your plan's history.
+- **Diff Viewer**: Compare any previous version side-by-side with your current file.
+- **Restore**: Recover any past version with a single click.
+
+**How to Use:**
+1. **View History**: Run the command `Layr: View Plan History` (`Ctrl+Shift+P`).
+2. **Compare Versions**: In the history panel, click the "Diff with Active" button next to any version.
+   - This opens a standard VS Code diff view comparing that past version with your currently open file.
+3. **Restore Version**: Click "Restore" to open that specific version in a new editor window.
+
+**Where is it stored?**
+All version history is stored safely in your workspace under the `.layr/history/` directory.
+
+> **Note**: This feature requires you to have a workspace folder open in VS Code. If you are just editing a single file without a folder, history cannot be saved.
+
 ### Best Practices for Prompts
 
 **Be Specific** : Include technology preferences, key features, and constraints
@@ -185,10 +252,14 @@ See `GROQ_SETUP.md` for detailed instructions.
 
 ## Available Commands
 
-| Command | Description | Shortcut |
-|---------|-------------|----------|
-| `Layr: Create Plan` | Generate a new project plan from description | None |
-| `Layr: Execute Plan` | Send plan to AI assistant for implementation | None |
+| Command | Description | Access |
+|---------|-------------|--------|
+| `Layr: Create Plan` | Generate a new project plan from description | `Ctrl+Alt+P` / `Cmd+Alt+P` |
+| `Layr: Execute Plan` | Send plan to AI assistant for implementation | Command Palette |
+| `Layr: Export Plan` | Export plan to PDF or HTML format | Command Palette |
+| `Layr: Refine Plan Section` | Improve selected text with AI refinement | Right-click menu / Command Palette |
+| `Apply Changes` | Accept refined changes in diff view | Editor toolbar (✓) |
+| `Discard Changes` | Reject refined changes in diff view | Editor toolbar (✗) |
 
 ## Plan Output Structure
 
@@ -331,6 +402,33 @@ MIT License - see LICENSE file for details
 ##  Creators
 
 - Developed by [Manas Dutta](https://github.com/manasdutta04)
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Anusha0501"><img src="https://avatars.githubusercontent.com/u/117845601?v=4?s=100" width="100px;" alt="Anusha"/><br /><sub><b>Anusha</b></sub></a><br /><a href="https://github.com/manasdutta04/layr/commits?author=Anusha0501" title="Code">💻</a> <a href="https://github.com/manasdutta04/layr/commits?author=Anusha0501" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://resume-pranav-kale.vercel.app/"><img src="https://avatars.githubusercontent.com/u/204769921?v=4?s=100" width="100px;" alt="Pranav Kale Jain"/><br /><sub><b>Pranav Kale Jain</b></sub></a><br /><a href="https://github.com/manasdutta04/layr/commits?author=Pranavkale11" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/VITianYash42"><img src="https://avatars.githubusercontent.com/u/175908232?v=4?s=100" width="100px;" alt="Yash Singhal"/><br /><sub><b>Yash Singhal</b></sub></a><br /><a href="https://github.com/manasdutta04/layr/commits?author=VITianYash42" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://shaikhwarsi.xyz"><img src="https://avatars.githubusercontent.com/u/86195374?v=4?s=100" width="100px;" alt="ShaikhWarsi"/><br /><sub><b>ShaikhWarsi</b></sub></a><br /><a href="https://github.com/manasdutta04/layr/commits?author=ShaikhWarsi" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Psp32"><img src="https://avatars.githubusercontent.com/u/177336799?v=4?s=100" width="100px;" alt="Prem Patro"/><br /><sub><b>Prem Patro</b></sub></a><br /><a href="https://github.com/manasdutta04/layr/commits?author=Psp32" title="Code">💻</a> <a href="https://github.com/manasdutta04/layr/commits?author=Psp32" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Doc-Entity"><img src="https://avatars.githubusercontent.com/u/135068320?v=4?s=100" width="100px;" alt="Doc-Entity"/><br /><sub><b>Doc-Entity</b></sub></a><br /><a href="https://github.com/manasdutta04/layr/commits?author=Doc-Entity" title="Documentation">📖</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+Thanks to these amazing people <3
+
 
 ## Issues & Support
 
